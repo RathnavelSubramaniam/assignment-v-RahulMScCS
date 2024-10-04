@@ -1,0 +1,109 @@
+---
+output:
+  
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+        
+  pdf_document:
+    fig_caption: true
+    fig_crop: false
+  word_document: default
+params:
+    printcode: false
+---
+
+---
+title: "MACHINE LEARNING ASSIGNMENT-5"
+author: "RAHUL_R"
+Reg No: "1P23CS027"
+date: "2024-10-4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r  include=FALSE}
+library(ISLR)
+library(MASS)
+library(glmnet)
+library(pls)
+```
+
+# QUESTION 1
+## We will now try to predict per capita crime rate in the `Boston` data set.
+
+### a. Try out some of the regression methods explored in this chapter, such as best subset selection, the lasso, ridge regression, and PCR. Present and discuss results for the approaches that you consider.
+
+
+```{r}
+set.seed(1)
+train_boston <- sample(nrow(Boston), nrow(Boston) * 2 / 3)
+training_data_boston <- Boston[train_boston, ]
+testing_data_boston <- Boston[-train_boston, ]
+crim_test <- testing_data_boston$crim
+crim_train <-training_data_boston$crim
+hist(log(Boston$crim))
+mse_list <- list()
+```
+
+```{r}
+mm <- model.matrix(log(crim) ~ ., data = training_data_boston)
+qa_lassofit <- cv.glmnet(mm, log(crim_train), alpha = 1)
+p <- predict(qa_lassofit, model.matrix(log(crim) ~ ., data = testing_data_boston), s = qa_lassofit$lambda.min)
+(mse_list$lasso <- mean((p - log(crim_test))^2))
+```
+
+
+```{r}
+fit4 <- pcr(log(crim) ~ ., data = training_data_boston, scale = TRUE, validation = "CV")
+validationplot(fit4, val.type = "MSEP")
+p <- predict(fit4, testing_data_boston, ncomp = 13)
+(mse_list$pcr <- mean((p - log(crim_test))^2))
+```
+
+
+
+
+### b. Propose a model (or set of models) that seem to perform well on this dataset, and justify your answer. Make sure that you are evaluating model performance using validation set error, cross-validation, or some other reasonable alternative, as opposed to using training error.
+
+We will try to fit models to `log(Boston$crim)` which is closer to a normal
+distribution.
+
+
+
+```{r}
+fit <- lm(log(crim) ~ ., data = training_data_boston)
+mean((predict(fit, testing_data_boston) - log(crim_test))^2)
+
+mm <- model.matrix(log(crim) ~ ., data = training_data_boston)
+fit2 <- cv.glmnet(mm, log(crim_train), alpha = 0)
+p <- predict(fit2, model.matrix(log(crim) ~ ., data = testing_data_boston), s = fit2$lambda.min)
+(mse_list$ridge <- mean((p - log(crim_test))^2))
+
+
+fit5 <- plsr(log(crim) ~ ., data = training_data_boston, scale = TRUE, validation = "CV")
+validationplot(fit5, val.type = "MSEP")
+p <- predict(fit5, testing_data_boston, ncomp = 6)
+(mse_list$plsr <-mean((p - log(crim_test))^2))
+```
+
+
+```{r}
+barplot(unlist(mse_list), ylab = "Test MSE", horiz = TRUE)
+```
+
+In this case, Lasso regression (with \alpha=1) performs slightly better than unpenalized regression. 
+Lasso has set some coefficients to zero, indicating that it effectively selects the most important features while ignoring less relevant ones.
+
+
+```{r}
+coef(qa_lassofit, s = fit2$lambda.min)
+```
+### c. Does your chosen model involve all of the features in the data set? Why or why not?
+
+Not all features are included due to the lasso penalization.
